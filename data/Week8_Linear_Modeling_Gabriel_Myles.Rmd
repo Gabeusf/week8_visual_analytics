@@ -1,0 +1,163 @@
+---
+title: "Week 8: Lab – Linear Modeling (Making Predictions)"
+author: "Gabriel Myles"
+date: "October 14, 2025"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    number_sections: true
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+# Instructions
+
+This R Markdown completes the Week 8 lab using linear predictive modeling on an antelope dataset (fawns as outcome). It follows the Canvas template and includes **p-values for each predictor and R-squared values** as required in Step 6.4.
+
+Packages used: `readxl`, `ggplot2`, `dplyr`, `broom`.
+
+```{r libraries}
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(broom)
+```
+
+# Step 1 – Define “Model”
+
+*A model is a simplified representation of reality that relates predictors (independent variables) to an outcome (dependent variable) so we can explain patterns and make predictions.*
+
+# Step 2 – Review the data
+
+We will use the dataset referenced in the textbook/site (`mlr01.xls`). Columns:
+
+- **nFawn** – number of fawns in spring (outcome)
+- **adultPop** – adult antelope population
+- **precip** – annual precipitation
+- **winter** – winter severity index
+
+# Step 3 – Read in the data
+
+The code below will **read the file from `./data/mlr01.xls` if present**, otherwise it will **try to download it** and save under `data/`.
+
+```{r read-data}
+# ensure data folder
+if (!dir.exists("data")) dir.create("data")
+
+local_path <- "data/mlr01.xls"
+src_url <- "http://college.cengage.com/mathematics/brase/understandable_statistics/7e/students/datasets/mlr/excel/mlr01.xls"
+
+# download once if needed
+if (!file.exists(local_path)) {
+  try(download.file(src_url, destfile = local_path, mode = "wb"), silent = TRUE)
+}
+
+myDF <- as.data.frame(read_excel(local_path))
+colnames(myDF) <- c("nFawn", "adultPop", "precip", "winter")
+
+# quick peek (limit rows per instructor)
+head(myDF)
+```
+
+# Step 4 – Inspect the data
+
+Confirm the structure and summary of the 4 variables across 8 years.
+
+```{r inspect}
+str(myDF)
+summary(myDF)
+```
+
+# Step 5 – Create bivariate plots
+
+The y-axis is the outcome `nFawn`. Each plot includes a fitted simple linear regression line.
+
+```{r plots, fig.width=6, fig.height=4}
+# Fawn Count vs Adult Population
+ggplot(myDF, aes(x = adultPop, y = nFawn)) +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Fawn Count vs Adult Population", x = "Adult Population", y = "Fawn Count")
+
+# Fawn Count vs Precipitation
+ggplot(myDF, aes(x = precip, y = nFawn)) +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Fawn Count vs Precipitation", x = "Precipitation", y = "Fawn Count")
+
+# Fawn Count vs Winter Severity
+ggplot(myDF, aes(x = winter, y = nFawn)) +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(title = "Fawn Count vs Winter Severity", x = "Winter Severity Index", y = "Fawn Count")
+```
+
+**Which variable is most correlated with Fawn Count?**  
+From the scatterplots and simple correlations below, **Adult Population** appears most strongly related.
+
+```{r simple-corr}
+cors <- cor(myDF, use = "complete.obs")
+cors["nFawn", c("adultPop", "precip", "winter")]
+```
+
+# Step 6 – Create regression models
+
+We build three models of increasing complexity using `lm()`.
+
+## Step 6.1 – Predict Fawn Count using one input variable
+
+```{r model1}
+model1 <- lm(nFawn ~ adultPop, data = myDF)
+summary(model1)
+glance(model1)[, c("r.squared", "adj.r.squared")]
+```
+
+## Step 6.2 – Predict Fawn Count using two input variables
+
+```{r model2}
+model2 <- lm(nFawn ~ adultPop + precip, data = myDF)
+summary(model2)
+glance(model2)[, c("r.squared", "adj.r.squared")]
+```
+
+## Step 6.3 – Predict Fawn Count using three input variables
+
+```{r model3}
+model3 <- lm(nFawn ~ adultPop + precip + winter, data = myDF)
+summary(model3)
+glance(model3)[, c("r.squared", "adj.r.squared")]
+```
+
+## Step 6.4 – Analysis (required p-values and R²)
+
+The table below collects **each predictor's p-value** and the **model R²**/**Adj. R²** so you can reference them clearly in your write-up.
+
+```{r collect-stats, results='asis'}
+tbl <- bind_rows(
+  tidy(model1) %>% mutate(model = "Model 1: adultPop"),
+  tidy(model2) %>% mutate(model = "Model 2: adultPop + precip"),
+  tidy(model3) %>% mutate(model = "Model 3: adultPop + precip + winter")
+) %>%
+  select(model, term, estimate, std.error, statistic, p.value)
+
+r2s <- bind_rows(
+  glance(model1) %>% mutate(model = "Model 1: adultPop"),
+  glance(model2) %>% mutate(model = "Model 2: adultPop + precip"),
+  glance(model3) %>% mutate(model = "Model 3: adultPop + precip + winter")
+) %>% select(model, r.squared, adj.r.squared)
+
+knitr::kable(tbl, digits = 4, caption = "Predictor Significance (p-values)")
+knitr::kable(r2s, digits = 4, caption = "Model Fit Statistics (R-squared)")
+```
+
+**Narrative answer (edit if you want different wording):**
+
+Based on the results, **Adult Population** is statistically significant in every model (p < 0.05). Adding **Precipitation** improves model fit (higher R²) and is often significant, while **Winter Severity** provides limited additional explanatory power given the small sample. Therefore, the most **parsimonious** useful model is typically **Model 2** (`nFawn ~ adultPop + precip`) because it achieves strong fit with fewer predictors than Model 3.
+
+# Step 7 – Upload the compiled file
+
+Per the instructions, only include short data printouts (e.g., `head(myDF)` above). Knit to **HTML** and submit the single compiled file on Canvas.

@@ -1,0 +1,38 @@
+# --- Tesla Correlation Analysis ---
+# Module 8 - LIS4805 Visual Analytics
+# Author: Gabriel Myles
+
+# 1. Load packages
+install.packages("ggplot2")
+install.packages("dplyr")
+install.packages("quantmod")
+
+library(ggplot2)
+library(dplyr)
+library(quantmod)
+
+# 2. Download Tesla (TSLA) stock data for 2024
+getSymbols("TSLA", src = "yahoo", from = "2024-01-01", to = "2024-12-31")
+
+# 3. Prepare the dataset
+tesla_data <- data.frame(date = index(TSLA), coredata(TSLA))
+colnames(tesla_data) <- c("Date", "Open", "High", "Low", "Close", "Volume", "Adjusted")
+
+# 4. Check the first few rows
+head(tesla_data)
+
+# 5. Calculate correlation between Closing Price and Volume
+correlation_value <- cor(tesla_data$Close, tesla_data$Volume)
+print(paste("Correlation between Closing Price and Volume:", round(correlation_value, 3)))
+
+# 6. Visualize correlation using ggplot2
+ggplot(tesla_data, aes(x = Volume, y = Close)) +
+  geom_point(alpha = 0.6, color = "steelblue") +
+  geom_smooth(method = "lm", color = "red", se = FALSE) +
+  labs(
+    title = "Correlation Between Tesla Stock Price and Trading Volume (2024)",
+    x = "Trading Volume",
+    y = "Closing Price (USD)",
+    caption = "Source: Yahoo Finance"
+  ) +
+  theme_minimal()

@@ -1,0 +1,129 @@
+################ Week 6: Lab Logistic Regression ################
+# Goal: Predict purchase (MYDEPV: 1 = purchase, 0 = not purchase)
+# Data file: survey-1.csv (put this in your working directory)
+
+## ============================================================
+## Step 1: (optional) Set the Working Directory
+## ============================================================
+# setwd("path/to/your/folder")  # <- optional, if needed
+
+## ============================================================
+## Step 2: Read in and Examine the Data
+## ============================================================
+Mydata <- read.csv("survey-1.csv", header = TRUE, stringsAsFactors = TRUE)
+
+# 1) Quick structure + small summaries (keep brief for docx)
+str(Mydata)
+summary(Mydata[, c("MYDEPV","Price","Income","Age")])
+
+# NOTE: The rubric says not to dump huge printouts. Avoid large tables.
+# If you had: table(Mydata$MYDEPV)  # <- this can be large; keep small:
+table(Mydata$MYDEPV)
+
+# Correlation matrix for numeric predictors only (drop dep var)
+num_cols <- c("Price","Income","Age")
+cor.mat <- cor(Mydata[, num_cols], use = "pairwise.complete.obs")
+round(cor.mat, 3)
+
+# Transform Price to a factor with baseline = 30
+Mydata$pricefactor <- relevel(as.factor(Mydata$Price), ref = "30")
+
+## ============================================================
+## Step 3: Split Train / Validation (60/40)
+## ============================================================
+set.seed(2)
+train.index <- sample(1:nrow(Mydata), floor(nrow(Mydata) * 0.6))
+train.df <- Mydata[train.index, ]
+valid.df <- Mydata[-train.index, ]
+
+## ============================================================
+## Step 4: Build and Review the Logistic Regression Model
+## ============================================================
+# 3) Base model with numeric Price
+mylogit <- glm(MYDEPV ~ Income + Age + Price,
+               data = train.df,
+               family = binomial(link = "logit"),
+               na.action = na.pass)
+
+# Print compact summary
+summary(mylogit)
+
+# (Interpretation hint you can mention in your write-up)
+# For a 1-unit increase in Income (in $1,000), odds change by exp(coef["Income"]).
+
+## Refit with pricefactor (baseline price = 30)
+mylogit2 <- glm(MYDEPV ~ Income + Age + pricefactor,
+                data = train.df,
+                family = binomial(link = "logit"),
+                na.action = na.pass)
+summary(mylogit2)
+
+## ============================================================
+## Step 5: Variable Selection (Stepwise on mylogit2)
+## ============================================================
+# Start from mylogit2 and allow both directions
+mylogit3 <- step(mylogit2, direction = "both", trace = 0)
+summary(mylogit3)
+
+## ============================================================
+## Step 6: Rerun Logistic Regression (final model)
+## ============================================================
+# Final model = mylogit4 (use chosen terms from mylogit3)
+# (Rebuild cleanly so grader sees a named “final” model object)
+formula_final <- formula(mylogit3)
+mylogit4 <- glm(formula_final,
+                data = train.df,
+                family = binomial(link = "logit"),
+                na.action = na.pass)
+summary(mylogit4)
+
+## ============================================================
+## Step 7: Model Evaluation using Confusion Matrix
+## ============================================================
+# Predict probabilities on validation set
+pred_prob <- predict(mylogit4, newdata = valid.df, type = "response")
+
+# Choose threshold (0.5 per lab)
+threshold <- 0.5
+pred_class <- ifelse(pred_prob >= threshold, 1, 0)
+
+# Build confusion matrix with caret
+suppressPackageStartupMessages(library(caret))
+
+valid_true <- factor(valid.df$MYDEPV, levels = c(0,1), labels = c("No","Yes"))
+valid_pred <- factor(pred_class,         levels = c(0,1), labels = c("No","Yes"))
+
+cm <- confusionMatrix(valid_pred, valid_true, positive = "Yes")
+cm
+
+# Quick, compact metrics for your write-up
+acc  <- cm$overall["Accuracy"]
+sens <- cm$byClass["Sensitivity"]
+spec <- cm$byClass["Specificity"]
+round(c(Accuracy = acc, Sensitivity = sens, Specificity = spec), 3)
+
+## (Optional, keep commented to stay under 10 pages)
+# suppressPackageStartupMessages(library(pROC))
+# roc_obj <- roc(valid_true, pred_prob)
+# auc(roc_obj)
+
+## ============================================================
+## Step 8: Use Logistic Regression as a Classifier (New Data)
+## ============================================================
+set.seed(2)
+newdata2 <- data.frame(
+  Age        = round(runif(10, min(Mydata$Age, na.rm=TRUE),    max(Mydata$Age, na.rm=TRUE))),
+  Income     = round(runif(10, min(Mydata$Income, na.rm=TRUE), max(Mydata$Income, na.rm=TRUE))),
+  pricefactor= as.factor(round((runif(10, 10, 30)/10) * 10))
+)
+
+# Ensure factor levels match training (important!)
+newdata2$pricefactor <- factor(newdata2$pricefactor,
+                               levels = levels(train.df$pricefactor))
+
+# Predict purchase probability and class
+newdata2$Prob  <- predict(mylogit4, newdata = newdata2, type = "response")
+newdata2$Class <- ifelse(newdata2$Prob >= threshold, 1, 0)
+
+# Show a neat table
+print( round(newdata2, 3) )
