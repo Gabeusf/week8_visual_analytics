@@ -1,0 +1,11 @@
+Name	Sex	Grade
+Alice	F	92
+Brian	M	85
+Cindy	F	88
+David	M	91
+Iris	F	95
+Liam	M	78
+Mia	F	89
+Noah	M	82
+Olivia	F	94
+Eli	M	87
